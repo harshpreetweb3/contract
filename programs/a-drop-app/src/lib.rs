@@ -40,6 +40,12 @@ pub mod airdrop_platform {
             &ctx.accounts.recipient_token_account.key()
         );
 
+        let airdrop_info = &mut ctx.accounts.airdrop_info;
+        airdrop_info.drop_amount = amount;
+        airdrop_info.claim_fee = 0;
+        airdrop_info.claimable_amount = 0; 
+        airdrop_info.bump = ctx.bumps.airdrop_info;
+
         // Invoke the transfer instruction on the token program
         transfer(
             CpiContext::new(
@@ -224,6 +230,9 @@ pub struct CreateAirdrop<'info> {
 
     #[account(
         init_if_needed,
+        // init
+        // seeds = [b"createairdrop"],
+        // bump,
         payer = sender_is_airdrop_creator,
         associated_token::mint = mint_account,  // apa same mint account kyo de rhe han? 
         associated_token::authority = recipient,
@@ -232,6 +241,8 @@ pub struct CreateAirdrop<'info> {
 
     #[account(
         init,
+        seeds = [b"airdrop"],
+        bump,
         payer = sender_is_airdrop_creator,
         space = 8 + AirdropInfo::INIT_SPACE,
     )]
@@ -280,6 +291,7 @@ pub struct AirdropInfo {
     pub drop_amount: u64,
     pub claimable_amount: u64,
     pub claim_fee: u64,
+    pub bump : u8
 }
 
 #[derive(Accounts)]
