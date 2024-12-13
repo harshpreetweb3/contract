@@ -1,18 +1,25 @@
 use anchor_lang::prelude::*;
 
 pub mod error;
+
+use anchor_lang::system_program;
+
 use error::ErrorCode;
 
-use anchor_spl::{   
+use anchor_spl::{
     associated_token::AssociatedToken,
-    token::{transfer, Mint, Token, TokenAccount, Transfer}
+    token::{Mint, Token, TokenAccount}
 };
+
+use crate::system_program::{transfer, Transfer};
+
 
 declare_id!("Fkth3sBewAfunPzzbUjGb5axoFCkPLJ3VDtgcDDuxF4H");
 
 #[program]
 pub mod airdrop_platform {
-    use anchor_spl::associated_token::get_associated_token_address;
+    use anchor_lang::solana_program::system_program;
+    use anchor_spl::{associated_token::get_associated_token_address, token};
 
     use super::*;
 
@@ -41,10 +48,10 @@ pub mod airdrop_platform {
         );
 
         // Invoke the transfer instruction on the token program
-        transfer(
+        token::transfer(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
-                Transfer {
+                token::Transfer {
                     from: ctx.accounts.sender_token_account.to_account_info(),
                     to: ctx.accounts.recipient_token_account.to_account_info(),
                     authority: ctx.accounts.sender_is_airdrop_creator.to_account_info(),
@@ -69,7 +76,7 @@ pub mod airdrop_platform {
         Ok(())
     }
 
-    pub fn claim_tokens(ctx : Context<ClaimTokens>, amount: u64) -> Result<()>{
+    pub fn claim_tokens(ctx : Context<ClaimTokens>, claim_fees: u64, number_of_tokens_to_claim : u64) -> Result<()>{
 
         msg!("Transferring tokens...");
         msg!(
@@ -77,7 +84,7 @@ pub mod airdrop_platform {
             &ctx.accounts.mint_account.to_account_info().key()
         );
 
-        // let token_account_address = get_associated_token_address(&ctx.accounts.system_account_signer.key(), token_mint_address, &ctx.accounts.mint_account.to_account_info().key());
+        // let token_account_address = get_associated_token_address(&ctx.accounts.system_account_or_system_account_signer.key(), token_mint_address, &ctx.accounts.mint_account.to_account_info().key());
         // let r = token_account_address.to_account_info();
 
         msg!(
@@ -90,17 +97,35 @@ pub mod airdrop_platform {
             &ctx.accounts.recipient_token_account.key()
         );
 
-         // Invoke the transfer instruction on the token program
-         transfer(
+
+        // Claimer -> Sytem Account
+        // claimer sends SOL = $1 to the contract
+        transfer(
+
             CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
                 Transfer {
-                    from: ctx.accounts.sender_token_account.to_account_info(),
-                    to: ctx.accounts.recipient_token_account.to_account_info(),
-                    authority: ctx.accounts.system_account_signer.to_account_info()
+                    from: ctx.accounts.claimer.to_account_info(),
+                    to: ctx.accounts.system_account_or_system_account_signer.to_account_info(),
                 },
             ),
-            amount * 10u64.pow(ctx.accounts.mint_account.decimals as u32), // Transfer amount, adjust for decimals
+            claim_fees,
+
+        )?;
+
+         // System Account -> Claimer
+         // System Account sends the tokens to caller of the function
+         // Invoke the transfer instruction on the token program
+         token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token::Transfer {
+                    from: ctx.accounts.sender_token_account.to_account_info(),
+                    to: ctx.accounts.recipient_token_account.to_account_info(),
+                    authority: ctx.accounts.system_account_or_system_account_signer.to_account_info()
+                },
+            ),
+            number_of_tokens_to_claim * 10u64.pow(ctx.accounts.mint_account.decimals as u32), // Transfer amount, adjust for decimals
         )?;
 
         msg!("The Mint Account used {}", ctx.accounts.recipient_token_account.mint);
@@ -116,7 +141,7 @@ pub mod airdrop_platform {
 
         msg!("Tokens transferred successfully.");
 
-        Ok(())   
+        Ok(())
     }
 
     //GET TOKEN ACCOUNT INFORMATION
@@ -154,14 +179,14 @@ pub mod airdrop_platform {
         msg!("token's account_address_of_contract :{}", associated_token_address);
         Ok(())
     }
-    
+
     // pub fn token_account_address(mint_address : Pubkey, contract_address : Pubkey) -> Pubkey {
     //     let associated_token_address = get_associated_token_address(&contract_address, &mint_address);
     //     msg!("token's account_address_of_contract :{}", associated_token_address);
     //     associated_token_address
     // }
 
-   
+
 
     // pub fn read_price(ctx: Context<Pyth>) -> Result<()> {
     //     let price_feed = &ctx.accounts.price_feed;
@@ -209,10 +234,10 @@ pub struct CreateAirdrop<'info> {
     #[account(mut)]
     pub sender_is_airdrop_creator: Signer<'info>,
 
-    pub recipient: SystemAccount<'info>,        
+    pub recipient: SystemAccount<'info>,
 
     #[account(mut)]
-    pub mint_account: Account<'info, Mint>, 
+    pub mint_account: Account<'info, Mint>,
     // O apna mint account kyo de rea?
 
     #[account(
@@ -225,7 +250,7 @@ pub struct CreateAirdrop<'info> {
     #[account(
         init_if_needed,
         payer = sender_is_airdrop_creator,
-        associated_token::mint = mint_account,  // apa same mint account kyo de rhe han? 
+        associated_token::mint = mint_account,  // apa same mint account kyo de rhe han?
         associated_token::authority = recipient,
     )]
     pub recipient_token_account: Account<'info, TokenAccount>,
@@ -245,25 +270,26 @@ pub struct CreateAirdrop<'info> {
 #[derive(Accounts)]
 pub struct ClaimTokens<'info> {
 
+    //will pay the SOL = 1$
     #[account(mut)]
     pub claimer : Signer<'info>,
 
     #[account(mut)]
-    pub system_account_signer : SystemAccount<'info>,
+    pub system_account_or_system_account_signer : SystemAccount<'info>,
     #[account(mut)]
     pub mint_account: Account<'info, Mint>,
 
     #[account(
         mut,
         associated_token::mint = mint_account,
-        associated_token::authority = system_account_signer,
+        associated_token::authority = system_account_or_system_account_signer,
     )]
     pub sender_token_account: Account<'info, TokenAccount>,
 
     #[account(
         init_if_needed,
-        payer = system_account_signer,
-        associated_token::mint = mint_account,  // apa same mint account kyo de rhe han? 
+        payer = system_account_or_system_account_signer,
+        associated_token::mint = mint_account,  // apa same mint account kyo de rhe han?
         associated_token::authority = claimer,
     )]
     pub recipient_token_account: Account<'info, TokenAccount>,
