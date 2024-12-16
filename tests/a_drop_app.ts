@@ -1,7 +1,8 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Keypair, PublicKey } from '@solana/web3.js';
 // import { Program } from "@coral-xyz/anchor";
-import { AirdropPlatform } from "../target/types/airdrop_platform";
+import { getAssociatedTokenAddressSync } from '@solana/spl-token';
+import { AirdropPlatform } from "../target/types/a_drop_app";
 
 describe("Airdrop Data!", () => {
 
