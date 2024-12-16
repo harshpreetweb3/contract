@@ -1,17 +1,21 @@
 [toolchain]
 
 [features]
+seeds = true
 resolution = true
 skip-lint = false
 
 [programs.localnet]
-a_drop_app = "Fkth3sBewAfunPzzbUjGb5axoFCkPLJ3VDtgcDDuxF4H"
+airdrop_platform = "Fkth3sBewAfunPzzbUjGb5axoFCkPLJ3VDtgcDDuxF4H"
+
+[programs.devnet]
+airdrop_platform = "Fkth3sBewAfunPzzbUjGb5axoFCkPLJ3VDtgcDDuxF4H"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

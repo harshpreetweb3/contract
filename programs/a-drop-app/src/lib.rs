@@ -4,7 +4,7 @@ pub mod error;
 
 use anchor_lang::system_program;
 
-use error::ErrorCode;
+// use error::ErrorCode;
 
 use anchor_spl::{
     associated_token::AssociatedToken,
@@ -18,7 +18,7 @@ declare_id!("Fkth3sBewAfunPzzbUjGb5axoFCkPLJ3VDtgcDDuxF4H");
 
 #[program]
 pub mod airdrop_platform {
-    use anchor_lang::solana_program::system_program;
+    // use anchor_lang::solana_program::system_program;
     use anchor_spl::{associated_token::get_associated_token_address, token};
 
     use super::*;
@@ -46,6 +46,12 @@ pub mod airdrop_platform {
             "To Token Address: {}",
             &ctx.accounts.recipient_token_account.key()
         );
+
+        let airdrop_info = &mut ctx.accounts.airdrop_info;
+        airdrop_info.drop_amount = amount;
+        airdrop_info.claim_fee = 0;
+        airdrop_info.claimable_amount = 0; 
+        airdrop_info.bump = ctx.bumps.airdrop_info;
 
         // Invoke the transfer instruction on the token program
         token::transfer(
@@ -257,6 +263,8 @@ pub struct CreateAirdrop<'info> {
 
     #[account(
         init,
+        seeds = [b"airdrop"],
+        bump,
         payer = sender_is_airdrop_creator,
         space = 8 + AirdropInfo::INIT_SPACE,
     )]
@@ -301,11 +309,12 @@ pub struct ClaimTokens<'info> {
 
 #[account]
 #[derive(InitSpace)] // automatically calculate the space required for the struct
-pub struct AirdropInfo {
+pub struct  AirdropInfo {
     // pub token : Pubkey,      //32 bytes
     pub drop_amount: u64,
     pub claimable_amount: u64,
     pub claim_fee: u64,
+    pub bump : u8
 }
 
 #[derive(Accounts)]
